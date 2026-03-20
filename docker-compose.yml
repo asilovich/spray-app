@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    container_name: spray-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-super-secret-key-change-this}
+    volumes:
+      - ./db:/app/db
+    restart: unless-stopped

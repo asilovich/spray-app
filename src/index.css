@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  
+  body {
+    background-color: white !important;
+    font-size: 10pt !important;
+  }
+  
+  .print-hide {
+    display: none !important;
+  }
+  
+  .print-full-width {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .print-no-shadow {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
+  
+  .print-break-inside-avoid {
+    break-inside: avoid;
+  }
+  
+  /* Totales en fila horizontal para impresión */
+  .print\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+  
+  .print\:p-2 {
+    padding: 0.5rem !important;
+  }
+  
+  .print\:text-sm {
+    font-size: 0.75rem !important;
+  }
+  
+  .print\:text-xl {
+    font-size: 1rem !important;
+  }
+  
+  /* Tablas más compactas */
+  table {
+    font-size: 9pt !important;
+  }
+  
+  th, td {
+    padding: 4px 6px !important;
+  }
+  
+  /* Reducir espacios */
+  .space-y-6 > * + * {
+    margin-top: 0.5rem !important;
+  }
+  
+  .mb-6 {
+    margin-bottom: 0.5rem !important;
+  }
+  
+  .p-6 {
+    padding: 0.75rem !important;
+  }
+  
+  .p-4 {
+    padding: 0.5rem !important;
+  }
+  
+  .gap-4 {
+    gap: 0.5rem !important;
+  }
+  
+  .rounded-2xl {
+    border-radius: 0.5rem !important;
+  }
+}
