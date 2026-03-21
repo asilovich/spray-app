@@ -180,8 +180,9 @@ app.post("/api/auth/register", async (req, res) => {
       args: [username, hashedPassword, role || 'operator', operator_number, secret_question, hashedAnswer, commission_rate || 8]
     });
     res.json({ success: true });
-  } catch (e) {
-    res.status(400).json({ error: "El usuario o número de operario ya existe." });
+  } catch (e: any) {
+    console.error("Registration error:", e);
+    res.status(400).json({ error: e.message || "El usuario o número de operario ya existe." });
   }
 });
 
@@ -649,6 +650,12 @@ if (process.env.NODE_ENV !== "production") {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
+
+// Global error handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: err.message || "Internal server error" });
+});
 
 // Initial DB setup
 initDb().then(() => {
