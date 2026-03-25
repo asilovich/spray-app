@@ -15,12 +15,22 @@ const __dirname = path.dirname(__filename);
 
 // PostgreSQL Database Client (Supabase)
 const DB_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
-const sql = postgres(DB_URL, {
-  prepare: false, // Required for Supabase connection pooling
-  max: 10, // Connection pool size
-  idle_timeout: 20,
-  connect_timeout: 10,
-});
+console.log("Database URL configured:", DB_URL ? "Yes (hidden)" : "No");
+
+let sql: any;
+try {
+  sql = postgres(DB_URL, {
+    prepare: false,
+    max: 1, // Reduce to 1 for serverless
+    idle_timeout: 10,
+    connect_timeout: 5,
+    ssl: { rejectUnauthorized: false }, // Allow SSL without strict verification
+  });
+  console.log("PostgreSQL client created successfully");
+} catch (e: any) {
+  console.error("Failed to create PostgreSQL client:", e.message);
+  throw e;
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-change-this";
 
@@ -30,10 +40,16 @@ app.use(express.json());
 // Health check endpoint
 app.get("/api/health", async (req, res) => {
   try {
+    console.log("Health check called");
+    if (!sql) {
+      return res.status(500).json({ status: "error", message: "Database client not initialized" });
+    }
     const result = await sql`SELECT 1 as test`;
+    console.log("Health check success:", result);
     res.json({ status: "ok", db: "connected", test: result[0] });
   } catch (e: any) {
-    res.status(500).json({ status: "error", db: "disconnected", error: e.message });
+    console.error("Health check failed:", e.message, e.stack);
+    res.status(500).json({ status: "error", db: "disconnected", error: e.message, stack: e.stack });
   }
 });
 
