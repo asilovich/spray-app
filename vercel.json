@@ -20,5 +20,9 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "SUPABASE_DB_URL": "@supabase_db_url",
+    "JWT_SECRET": "@jwt_secret"
+  }
 }
