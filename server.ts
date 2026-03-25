@@ -17,20 +17,19 @@ const __dirname = path.dirname(__filename);
 const DB_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
 console.log("Database URL configured:", DB_URL ? "Yes (hidden)" : "No");
 
-let sql: any;
-try {
-  sql = postgres(DB_URL, {
-    prepare: false,
-    max: 1, // Reduce to 1 for serverless
-    idle_timeout: 10,
-    connect_timeout: 5,
-    ssl: { rejectUnauthorized: false }, // Allow SSL without strict verification
-  });
-  console.log("PostgreSQL client created successfully");
-} catch (e: any) {
-  console.error("Failed to create PostgreSQL client:", e.message);
-  throw e;
-}
+// Create sql proxy for lazy initialization
+const sql = new Proxy({} as any, {
+  get(target, prop) {
+    const client = postgres(DB_URL, {
+      prepare: false,
+      max: 1,
+      idle_timeout: 10,
+      connect_timeout: 5,
+      ssl: { rejectUnauthorized: false },
+    });
+    return (client as any)[prop];
+  },
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-change-this";
 
