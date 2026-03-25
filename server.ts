@@ -27,6 +27,16 @@ const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key-change-this";
 const app = express();
 app.use(express.json());
 
+// Health check endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    const result = await sql`SELECT 1 as test`;
+    res.json({ status: "ok", db: "connected", test: result[0] });
+  } catch (e: any) {
+    res.status(500).json({ status: "error", db: "disconnected", error: e.message });
+  }
+});
+
 // Initialize Database Schema
 const initDb = async () => {
   // Create tables if they don't exist
