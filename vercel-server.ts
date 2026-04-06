@@ -224,6 +224,138 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+// Clients
+app.get("/api/clients", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT * FROM clients ORDER BY name");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/clients", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { name, type, responsible, address, city, cuit, phone, email, default_price } = req.body;
+    
+    const result = await client.query(
+      "INSERT INTO clients (name, type, responsible, address, city, cuit, phone, email, default_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
+      [name, type || 'individual', responsible, address, city, cuit, phone, email, default_price || 0]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("Create client error:", error.message);
+    if (error.message.includes("duplicate")) {
+      return res.status(400).json({ error: "Client name or CUIT already exists" });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/clients/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { name, type, responsible, address, city, cuit, phone, email, default_price } = req.body;
+    
+    const result = await client.query(
+      "UPDATE clients SET name=$1, type=$2, responsible=$3, address=$4, city=$5, cuit=$6, phone=$7, email=$8, default_price=$9 WHERE id=$10 RETURNING *",
+      [name, type, responsible, address, city, cuit, phone, email, default_price, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Client not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/clients/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    await client.query("DELETE FROM clients WHERE id=$1", [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Fields
+app.get("/api/fields", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT * FROM fields ORDER BY name");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/fields", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { client_id, name, area } = req.body;
+    
+    const result = await client.query(
+      "INSERT INTO fields (client_id, name, area) VALUES ($1, $2, $3) RETURNING *",
+      [client_id, name, area]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/fields/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { client_id, name, area } = req.body;
+    
+    const result = await client.query(
+      "UPDATE fields SET client_id=$1, name=$2, area=$3 WHERE id=$4 RETURNING *",
+      [client_id, name, area, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Field not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/fields/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    await client.query("DELETE FROM fields WHERE id=$1", [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Serve static frontend
 app.use(express.static(path.join(__dirname, "dist")));
 app.get("*", (req, res) => {
