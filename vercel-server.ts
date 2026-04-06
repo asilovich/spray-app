@@ -6,14 +6,6 @@ import jwt from "jsonwebtoken";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
-// Dynamic import for Vite (only in dev)
-let createViteServer: any = null;
-if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-  import("vite").then((vite) => {
-    createViteServer = vite.createServer;
-  });
-}
-
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -185,26 +177,10 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Serve frontend
-if (process.env.NODE_ENV !== "production") {
-  const vitePromise = createViteServer({ server: { middlewareMode: true }, appType: "spa" });
-  app.use(async (req, res, next) => {
-    const vite = await vitePromise;
-    vite.middlewares(req, res, next);
-  });
-} else {
-  app.use(express.static(path.join(__dirname, "dist")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "dist", "index.html"));
-  });
-}
-
-// Start server
-if (!process.env.VERCEL) {
-  const PORT = Number(process.env.PORT) || 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server on port ${PORT}`);
-  });
-}
+// Serve static frontend
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
 
 export default app;
