@@ -117,13 +117,23 @@ const initDb = async () => {
     
     // Check if admin exists
     const adminCheck = await client.query("SELECT * FROM users WHERE username = 'admin'");
+    console.log("Admin check result:", adminCheck.rows.length, "rows");
+    
     if (adminCheck.rows.length === 0) {
       const hashedPassword = bcrypt.hashSync("administrador", 10);
+      console.log("Creating admin user with hashed password:", hashedPassword.substring(0, 20) + "...");
+      
       await client.query(
         "INSERT INTO users (username, password, role) VALUES ($1, $2, $3)",
         ["admin", hashedPassword, "admin"]
       );
-      console.log("Admin user created");
+      console.log("Admin user created successfully");
+      
+      // Verify
+      const verify = await client.query("SELECT username, role FROM users WHERE username = 'admin'");
+      console.log("Verified admin:", verify.rows[0]);
+    } else {
+      console.log("Admin already exists");
     }
     
     dbInitialized = true;
@@ -163,16 +173,53 @@ app.post("/api/login", async (req, res) => {
     if (!client) return res.status(500).json({ error: "Database not available" });
     
     const { username, password } = req.body;
+    console.log("Login attempt for:", username);
+    
     const result = await client.query("SELECT * FROM users WHERE username = $1", [username]);
     const user = result.rows[0];
     
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    if (!user) {
+      console.log("User not found:", username);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    
+    const passwordMatch = bcrypt.compareSync(password, user.password);
+    console.log("Password match:", passwordMatch);
+    
+    if (!passwordMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
     
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role, operator_number: user.operator_number }, JWT_SECRET);
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, operator_number: user.operator_number } });
   } catch (error: any) {
+    console.error("Login error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Register
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { username, password, role, operator_number, secret_question, secret_answer, commission_rate } = req.body;
+    
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const hashedAnswer = secret_answer ? bcrypt.hashSync(secret_answer.toLowerCase().trim(), 10) : null;
+    
+    await client.query(
+      "INSERT INTO users (username, password, role, operator_number, secret_question, secret_answer, commission_rate) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [username, hashedPassword, role, operator_number || null, secret_question || null, hashedAnswer, commission_rate || 8]
+    );
+    
+    res.status(201).json({ success: true });
+  } catch (error: any) {
+    console.error("Register error:", error.message);
+    if (error.message.includes("duplicate")) {
+      return res.status(400).json({ error: "Username or operator number already exists" });
+    }
     res.status(500).json({ error: error.message });
   }
 });
