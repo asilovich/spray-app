@@ -1281,7 +1281,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="space-y-6">
-                    {finances?.operatorSummary.map((s, i) => (
+                    {finances?.operatorSummary?.map((s, i) => (
                       <div key={i} className="border border-stone-200 rounded-xl overflow-hidden">
                         <div className="bg-stone-50 p-4 border-b border-stone-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                           <div>
