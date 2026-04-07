@@ -356,6 +356,191 @@ app.delete("/api/fields/:id", async (req, res) => {
   }
 });
 
+// Users
+app.get("/api/users", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT id, username, role, operator_number, commission_rate FROM users ORDER BY username");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Jobs
+app.get("/api/jobs", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query(`
+      SELECT j.*, f.name as field_name, c.name as client_name, p.name as product_name 
+      FROM jobs j 
+      LEFT JOIN fields f ON j.field_id = f.id 
+      LEFT JOIN clients c ON f.client_id = c.id 
+      LEFT JOIN products p ON j.product_id = p.id 
+      ORDER BY j.date DESC
+    `);
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/jobs", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { field_id, date, product_id, product_amount, price_per_hectare, total_amount, status, notes, operator_id, invoicing_status, vat_rate, machine_hectares, paid, financial_year_id } = req.body;
+    
+    const result = await client.query(
+      `INSERT INTO jobs (field_id, date, product_id, product_amount, price_per_hectare, total_amount, status, notes, operator_id, invoicing_status, vat_rate, machine_hectares, paid, financial_year_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [field_id, date, product_id || null, product_amount, price_per_hectare || 0, total_amount || 0, status || 'pending', notes, operator_id || null, invoicing_status || 'pending', vat_rate || 0, machine_hectares || 0, paid || 0, financial_year_id || null]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Products
+app.get("/api/products", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT * FROM products ORDER BY name");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/products", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { name, unit, cost_per_unit } = req.body;
+    
+    const result = await client.query(
+      "INSERT INTO products (name, unit, cost_per_unit) VALUES ($1, $2, $3) RETURNING *",
+      [name, unit, cost_per_unit]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stats
+app.get("/api/stats", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const clientsCount = await client.query("SELECT COUNT(*) FROM clients");
+    const jobsCount = await client.query("SELECT COUNT(*) FROM jobs");
+    const fieldsCount = await client.query("SELECT COUNT(*) FROM fields");
+    const totalAmount = await client.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM jobs");
+    
+    res.json({
+      clients: parseInt(clientsCount.rows[0].count),
+      jobs: parseInt(jobsCount.rows[0].count),
+      fields: parseInt(fieldsCount.rows[0].count),
+      total: parseFloat(totalAmount.rows[0].total)
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Financial Years
+app.get("/api/financial-years", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT * FROM financial_years ORDER BY end_date DESC");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/financial-years", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { name, end_date } = req.body;
+    
+    const result = await client.query(
+      "INSERT INTO financial_years (name, end_date) VALUES ($1, $2) RETURNING *",
+      [name, end_date]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Expenses
+app.get("/api/expenses", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const result = await client.query("SELECT * FROM expenses ORDER BY date DESC");
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/expenses", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { description, amount, date, category, financial_year_id } = req.body;
+    
+    const result = await client.query(
+      "INSERT INTO expenses (description, amount, date, category, financial_year_id) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [description, amount, date, category, financial_year_id || null]
+    );
+    
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Finances
+app.get("/api/finances", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const incomeResult = await client.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM jobs");
+    const expenseResult = await client.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses");
+    
+    const income = parseFloat(incomeResult.rows[0].total);
+    const expenses = parseFloat(expenseResult.rows[0].total);
+    
+    res.json({ income, expenses, profit: income - expenses });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Serve static frontend
 app.use(express.static(path.join(__dirname, "dist")));
 app.get("*", (req, res) => {
