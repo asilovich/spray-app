@@ -376,11 +376,13 @@ app.get("/api/jobs", async (req, res) => {
     if (!client) return res.status(500).json({ error: "Database not available" });
     
     const result = await client.query(`
-      SELECT j.*, f.name as field_name, c.name as client_name, p.name as product_name 
+      SELECT j.*, f.name as field_name, f.area, c.name as client_name, p.name as product_name, 
+             u.operator_number, u.username as operator_name
       FROM jobs j 
       LEFT JOIN fields f ON j.field_id = f.id 
       LEFT JOIN clients c ON f.client_id = c.id 
       LEFT JOIN products p ON j.product_id = p.id 
+      LEFT JOIN users u ON j.operator_id = u.id
       ORDER BY j.date DESC
     `);
     res.json(result.rows);
@@ -403,6 +405,39 @@ app.post("/api/jobs", async (req, res) => {
     );
     
     res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put("/api/jobs/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    const result = await client.query(
+      "UPDATE jobs SET status=$1 WHERE id=$2 RETURNING *",
+      [status, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/jobs/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    await client.query("DELETE FROM jobs WHERE id=$1", [id]);
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
