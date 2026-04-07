@@ -564,14 +564,89 @@ app.get("/api/finances", async (req, res) => {
     const client = getPool();
     if (!client) return res.status(500).json({ error: "Database not available" });
     
-    const incomeResult = await client.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM jobs");
+    // Get income from jobs
+    const incomeResult = await client.query(`
+      SELECT 
+        COALESCE(SUM(total_amount), 0) as totalRevenue,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END), 0) as invoiced,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) as pending
+      FROM jobs
+    `);
+    
+    // Get expenses
     const expenseResult = await client.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses");
     
-    const income = parseFloat(incomeResult.rows[0].total);
-    const expenses = parseFloat(expenseResult.rows[0].total);
+    // Get operator summary
+    const operatorResult = await client.query(`
+      SELECT 
+        u.id as operator_id,
+        u.username as operator_name,
+        u.operator_number,
+        u.commission_rate,
+        COALESCE(SUM(j.machine_hectares), 0) as total_area,
+        COALESCE(SUM(j.total_amount), 0) as total_revenue,
+        COALESCE(SUM(j.total_amount) * (u.commission_rate / 100.0), 0) as commission_amount
+      FROM users u
+      LEFT JOIN jobs j ON u.id = j.operator_id
+      WHERE u.role = 'operator'
+      GROUP BY u.id, u.username, u.operator_number, u.commission_rate
+      ORDER BY u.operator_number
+    `);
     
-    res.json({ income, expenses, profit: income - expenses });
+    // Get operator jobs
+    const operatorJobsResult = await client.query(`
+      SELECT 
+        j.operator_id,
+        j.date,
+        j.machine_hectares,
+        j.total_amount,
+        j.status,
+        c.name as client_name,
+        f.name as field_name,
+        u.commission_rate,
+        (j.total_amount * (u.commission_rate / 100.0)) as commission_amount
+      FROM jobs j
+      LEFT JOIN fields f ON j.field_id = f.id
+      LEFT JOIN clients c ON f.client_id = c.id
+      LEFT JOIN users u ON j.operator_id = u.id
+      ORDER BY j.operator_id, j.date DESC
+    `);
+    
+    // Group jobs by operator
+    const operatorSummary = operatorResult.rows.map(op => ({
+      ...op,
+      jobs: operatorJobsResult.rows.filter(j => j.operator_id === op.operator_id)
+    }));
+    
+    // Get client summary
+    const clientResult = await client.query(`
+      SELECT 
+        c.name as client_name,
+        f.name as field_name,
+        f.area,
+        COALESCE(SUM(CASE WHEN j.status = 'completed' THEN j.machine_hectares ELSE 0 END), 0) as completed_area,
+        COALESCE(SUM(CASE WHEN j.status = 'pending' THEN j.machine_hectares ELSE 0 END), 0) as pending_area,
+        COALESCE(SUM(j.total_amount), 0) as total_amount
+      FROM clients c
+      LEFT JOIN fields f ON c.id = f.client_id
+      LEFT JOIN jobs j ON f.id = j.field_id
+      GROUP BY c.name, f.name, f.area
+      ORDER BY c.name, f.name
+    `);
+    
+    const totalRevenue = parseFloat(incomeResult.rows[0].totalrevenue);
+    const totalExpenses = parseFloat(expenseResult.rows[0].total) + operatorSummary.reduce((sum, op) => sum + parseFloat(op.commission_amount), 0);
+    const balance = totalRevenue - totalExpenses;
+    
+    res.json({
+      totalRevenue,
+      totalExpenses,
+      balance,
+      operatorSummary,
+      clientSummary: clientResult.rows
+    });
   } catch (error: any) {
+    console.error("Finances error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
