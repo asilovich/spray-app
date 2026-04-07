@@ -1253,19 +1253,19 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard 
                   label="Ingresos Totales" 
-                  value={`$${finances?.totalRevenue.toLocaleString() ?? 0}`} 
+                  value={`$${(finances?.totalRevenue || 0).toLocaleString()}`} 
                   icon={<TrendingUp className="text-emerald-600" />} 
                   description="Total facturado y pendiente"
                 />
                 <StatCard 
                   label="Gastos Totales" 
-                  value={`$${finances?.totalExpenses.toLocaleString() ?? 0}`} 
+                  value={`$${(finances?.totalExpenses || 0).toLocaleString()}`} 
                   icon={<Receipt className="text-red-600" />} 
                   description="Gastos operativos registrados"
                 />
                 <StatCard 
                   label="Balance Neto" 
-                  value={`$${finances?.balance.toLocaleString() ?? 0}`} 
+                  value={`$${(finances?.balance || 0).toLocaleString()}`} 
                   icon={<Wallet className="text-blue-600" />} 
                   description="Diferencia entre ingresos y gastos"
                 />
@@ -1291,7 +1291,7 @@ export default function App() {
                           <div className="flex gap-6 text-right">
                             <div>
                               <p className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1">Comisión Total</p>
-                              <p className="text-xl font-black text-emerald-600 font-mono">${s.commission_amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-xl font-black text-emerald-600 font-mono">${(s.commission_amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                           </div>
                         </div>
@@ -1313,7 +1313,7 @@ export default function App() {
                                   <td className="px-4 py-2 font-medium text-stone-900">{job.client_name}</td>
                                   <td className="px-4 py-2 text-stone-600">{job.field_name}</td>
                                   <td className="px-4 py-2 font-mono text-stone-600 text-right">{job.machine_hectares} ha</td>
-                                  <td className="px-4 py-2 font-mono font-bold text-emerald-600 text-right">${job.commission_amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-4 py-2 font-mono font-bold text-emerald-600 text-right">${(job.commission_amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                               ))}
                               {s.jobs.length === 0 && (
@@ -1537,7 +1537,7 @@ export default function App() {
                             <td className="px-4 py-3 text-stone-500 font-mono text-xs">-</td>
                             <td className="px-4 py-3 font-medium text-stone-900">Comisión Operario: {op.operator_name}</td>
                             <td className="px-4 py-3 text-right font-bold text-red-600 font-mono">
-                              -${op.commission_amount.toLocaleString()}
+                              ${(op.commission_amount || 0).toLocaleString()}
                             </td>
                           </tr>
                         ))}
