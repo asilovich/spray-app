@@ -763,6 +763,11 @@ export default function App() {
             <LogOut size={20} />
             Cerrar Sesión
           </button>
+          <div className="text-center pt-2">
+            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+              v{import.meta.env.VITE_APP_VERSION || '1.0.0'}
+            </span>
+          </div>
         </div>
       </aside>
 
