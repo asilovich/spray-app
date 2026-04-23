@@ -1343,21 +1343,21 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-100">
-                        {finances?.clientSummary.map((s, i) => (
+                        {finances?.clientSummary?.map((s, i) => (
                           <tr key={i} className="hover:bg-stone-50 transition-colors">
                             <td className="px-4 py-3">
                               <p className="font-bold text-stone-900">{s.client_name}</p>
                               <p className="text-xs text-stone-500">{s.field_name}</p>
                             </td>
-                            <td className="px-4 py-3 font-mono text-stone-600">{s.total_lot_area} ha</td>
+                            <td className="px-4 py-3 font-mono text-stone-600">{s.area || 0} ha</td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col gap-0.5">
-                                <span className="text-emerald-600 font-mono text-[10px]">{s.invoiced_area} ha Fact.</span>
-                                <span className="text-amber-600 font-mono text-[10px]">{s.pending_area} ha Pend.</span>
+                                <span className="text-emerald-600 font-mono text-[10px]">{s.completed_area || 0} ha Fact.</span>
+                                <span className="text-amber-600 font-mono text-[10px]">{s.pending_area || 0} ha Pend.</span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right font-bold text-stone-900 font-mono">
-                              ${s.total_revenue.toLocaleString()}
+                              ${(s.total_amount || 0).toLocaleString()}
                             </td>
                           </tr>
                         ))}
@@ -1528,11 +1528,11 @@ export default function App() {
                             </td>
                             <td className="px-4 py-3 font-medium text-stone-900">{e.description}</td>
                             <td className="px-4 py-3 text-right font-bold text-red-600 font-mono">
-                              -${e.amount.toLocaleString()}
+                              -${(e.amount || 0).toLocaleString()}
                             </td>
                           </tr>
                         ))}
-                        {finances?.operatorSummary.filter(op => op.commission_amount > 0).map(op => (
+                        {finances?.operatorSummary?.filter(op => op.commission_amount > 0).map(op => (
                           <tr key={`comm-${op.operator_id}`} className="hover:bg-stone-50 transition-colors bg-orange-50/30">
                             <td className="px-4 py-3 text-stone-500 font-mono text-xs">-</td>
                             <td className="px-4 py-3 font-medium text-stone-900">Comisión Operario: {op.operator_name}</td>
@@ -1719,16 +1719,16 @@ export default function App() {
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 print:grid-cols-3">
                                 <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm print:p-2 print-no-shadow">
                                   <p className="text-sm font-bold text-stone-500 uppercase mb-1 print:text-sm">Ingresos Totales</p>
-                                  <p className="text-2xl font-bold text-emerald-600 print:text-xl">${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                  <p className="text-2xl font-bold text-emerald-600 print:text-xl">${(totalIncome || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                 </div>
                                 <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm print:p-2 print-no-shadow">
                                   <p className="text-sm font-bold text-stone-500 uppercase mb-1 print:text-sm">Egresos Totales</p>
-                                  <p className="text-2xl font-bold text-red-600 print:text-xl">${totalExpensesWithCommissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                  <p className="text-2xl font-bold text-red-600 print:text-xl">${(totalExpensesWithCommissions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                 </div>
                                 <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm print:p-2 print-no-shadow">
                                   <p className="text-sm font-bold text-stone-500 uppercase mb-1 print:text-sm">Balance</p>
                                   <p className={`text-2xl font-bold ${balance >= 0 ? 'text-emerald-600' : 'text-red-600'} print:text-xl`}>
-                                    ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ${(balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </p>
                                 </div>
                               </div>
@@ -1753,7 +1753,7 @@ export default function App() {
                                       {op.operator_name !== 'Sin Operario' && (
                                         <div>
                                           <p className="text-xs font-bold text-emerald-600 uppercase">Comisión (8%)</p>
-                                          <p className="font-bold text-emerald-700">${op.total_commission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                          <p className="font-bold text-emerald-700">${(op.total_commission || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                         </div>
                                       )}
                                     </div>
@@ -1779,9 +1779,9 @@ export default function App() {
                                             <td className="px-4 py-3 font-medium text-stone-900">{job.client_name}</td>
                                             <td className="px-4 py-3 text-stone-600">{job.field_name}</td>
                                             <td className="px-4 py-3 text-stone-600 text-right">{job.machine_hectares}</td>
-                                            <td className="px-4 py-3 font-mono text-stone-600 text-right">${job.total_amount.toLocaleString()}</td>
+                                            <td className="px-4 py-3 font-mono text-stone-600 text-right">${(job.total_amount || 0).toLocaleString()}</td>
                                             {op.operator_name !== 'Sin Operario' && (
-                                              <td className="px-4 py-3 font-mono font-bold text-emerald-600 text-right">${(job.total_amount * ((job.operator_commission_rate ?? 8) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                              <td className="px-4 py-3 font-mono font-bold text-emerald-600 text-right">${((job.total_amount || 0) * ((job.operator_commission_rate ?? 8) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             )}
                                           </tr>
                                         ))}
@@ -1814,7 +1814,7 @@ export default function App() {
                                             {exp.category}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-3 font-mono font-bold text-red-600 text-right">${exp.amount.toLocaleString()}</td>
+                                        <td className="px-4 py-3 font-mono font-bold text-red-600 text-right">${(exp.amount || 0).toLocaleString()}</td>
                                       </tr>
                                     ))}
                                     {operatorsList.filter((op: any) => op.total_commission > 0).map((op: any) => (
@@ -1826,7 +1826,7 @@ export default function App() {
                                             Comisiones
                                           </span>
                                         </td>
-                                        <td className="px-4 py-3 font-mono font-bold text-red-600 text-right">${op.total_commission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td className="px-4 py-3 font-mono font-bold text-red-600 text-right">${(op.total_commission || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                       </tr>
                                     ))}
                                     {(!selectedFinancialYearData?.expenses || selectedFinancialYearData.expenses.length === 0) && operatorsList.filter((op: any) => op.total_commission > 0).length === 0 && (

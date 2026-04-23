@@ -383,6 +383,7 @@ app.get("/api/jobs", async (req, res) => {
       LEFT JOIN clients c ON f.client_id = c.id 
       LEFT JOIN products p ON j.product_id = p.id 
       LEFT JOIN users u ON j.operator_id = u.id
+      WHERE j.financial_year_id IS NULL
       ORDER BY j.date DESC
     `);
     res.json(result.rows);
@@ -421,6 +422,48 @@ app.put("/api/jobs/:id", async (req, res) => {
     const result = await client.query(
       "UPDATE jobs SET status=$1 WHERE id=$2 RETURNING *",
       [status, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH for updating job status (used by frontend)
+app.patch("/api/jobs/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    const result = await client.query(
+      "UPDATE jobs SET status=$1 WHERE id=$2 RETURNING *",
+      [status, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH for updating job billing information
+app.patch("/api/jobs/:id/billing", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { invoicing_status, vat_rate, paid } = req.body;
+    
+    const result = await client.query(
+      "UPDATE jobs SET invoicing_status=$1, vat_rate=$2, paid=$3 WHERE id=$4 RETURNING *",
+      [invoicing_status, vat_rate, paid ? 1 : 0, id]
     );
     
     if (result.rows.length === 0) return res.status(404).json({ error: "Job not found" });
@@ -480,16 +523,26 @@ app.get("/api/stats", async (req, res) => {
     const client = getPool();
     if (!client) return res.status(500).json({ error: "Database not available" });
     
-    const clientsCount = await client.query("SELECT COUNT(*) FROM clients");
-    const jobsCount = await client.query("SELECT COUNT(*) FROM jobs");
-    const fieldsCount = await client.query("SELECT COUNT(*) FROM fields");
-    const totalAmount = await client.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM jobs");
+    const statsResult = await client.query(`
+      SELECT 
+        COUNT(*) as total_jobs,
+        COALESCE(SUM(total_amount), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) as pending_revenue,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END), 0) as collected_revenue,
+        COALESCE(SUM(machine_hectares), 0) as total_machine_hectares
+      FROM jobs
+      WHERE financial_year_id IS NULL
+    `);
+    
+    const stats = statsResult.rows[0];
     
     res.json({
-      clients: parseInt(clientsCount.rows[0].count),
-      jobs: parseInt(jobsCount.rows[0].count),
-      fields: parseInt(fieldsCount.rows[0].count),
-      total: parseFloat(totalAmount.rows[0].total)
+      total_jobs: parseInt(stats.total_jobs),
+      total_revenue: parseFloat(stats.total_revenue),
+      pending_revenue: parseFloat(stats.pending_revenue),
+      collected_revenue: parseFloat(stats.collected_revenue),
+      total_hectares: parseFloat(stats.total_machine_hectares),
+      total_machine_hectares: parseFloat(stats.total_machine_hectares)
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -521,7 +574,110 @@ app.post("/api/financial-years", async (req, res) => {
       [name, end_date]
     );
     
+    const newYearId = result.rows[0].id;
+
+    // Move current jobs to the new financial year
+    await client.query("UPDATE jobs SET financial_year_id = $1 WHERE financial_year_id IS NULL", [newYearId]);
+    
+    // Move current expenses to the new financial year
+    await client.query("UPDATE expenses SET financial_year_id = $1 WHERE financial_year_id IS NULL", [newYearId]);
+    
     res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get jobs for a specific financial year
+app.get("/api/financial-years/:id/jobs", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    
+    const result = await client.query(`
+      SELECT j.*, f.name as field_name, f.area, c.name as client_name, p.name as product_name, 
+             u.operator_number, u.username as operator_name, u.commission_rate as operator_commission_rate
+      FROM jobs j 
+      LEFT JOIN fields f ON j.field_id = f.id 
+      LEFT JOIN clients c ON f.client_id = c.id 
+      LEFT JOIN products p ON j.product_id = p.id 
+      LEFT JOIN users u ON j.operator_id = u.id
+      WHERE j.financial_year_id = $1
+      ORDER BY j.date DESC
+    `, [id]);
+    
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get expenses for a specific financial year
+app.get("/api/financial-years/:id/expenses", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    
+    const result = await client.query(`
+      SELECT * FROM expenses 
+      WHERE financial_year_id = $1
+      ORDER BY date DESC
+    `, [id]);
+    
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update financial year
+app.put("/api/financial-years/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { name, end_date } = req.body;
+    
+    const result = await client.query(
+      "UPDATE financial_years SET name=$1, end_date=$2 WHERE id=$3 RETURNING *",
+      [name, end_date, id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Financial year not found" });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete financial year
+app.delete("/api/financial-years/:id", async (req, res) => {
+  try {
+    const client = getPool();
+    if (!client) return res.status(500).json({ error: "Database not available" });
+    
+    const { id } = req.params;
+    const { password } = req.body;
+    
+    // TODO: Verify admin password before deleting
+    // For now, just delete the financial year and associated data
+    
+    // Delete associated jobs and expenses first
+    await client.query("DELETE FROM jobs WHERE financial_year_id = $1", [id]);
+    await client.query("DELETE FROM expenses WHERE financial_year_id = $1", [id]);
+    
+    const result = await client.query(
+      "DELETE FROM financial_years WHERE id=$1 RETURNING *",
+      [id]
+    );
+    
+    if (result.rows.length === 0) return res.status(404).json({ error: "Financial year not found" });
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -533,7 +689,7 @@ app.get("/api/expenses", async (req, res) => {
     const client = getPool();
     if (!client) return res.status(500).json({ error: "Database not available" });
     
-    const result = await client.query("SELECT * FROM expenses ORDER BY date DESC");
+    const result = await client.query("SELECT * FROM expenses WHERE financial_year_id IS NULL ORDER BY date DESC");
     res.json(result.rows);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -571,10 +727,11 @@ app.get("/api/finances", async (req, res) => {
         COALESCE(SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END), 0) as invoiced,
         COALESCE(SUM(CASE WHEN status = 'pending' THEN total_amount ELSE 0 END), 0) as pending
       FROM jobs
+      WHERE financial_year_id IS NULL
     `);
     
     // Get expenses
-    const expenseResult = await client.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses");
+    const expenseResult = await client.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE financial_year_id IS NULL");
     
     // Get operator summary
     const operatorResult = await client.query(`
@@ -587,7 +744,7 @@ app.get("/api/finances", async (req, res) => {
         COALESCE(SUM(j.total_amount), 0) as total_revenue,
         COALESCE(SUM(j.total_amount) * (u.commission_rate / 100.0), 0) as commission_amount
       FROM users u
-      LEFT JOIN jobs j ON u.id = j.operator_id
+      LEFT JOIN jobs j ON u.id = j.operator_id AND j.financial_year_id IS NULL
       WHERE u.role = 'operator'
       GROUP BY u.id, u.username, u.operator_number, u.commission_rate
       ORDER BY u.operator_number
@@ -609,6 +766,7 @@ app.get("/api/finances", async (req, res) => {
       LEFT JOIN fields f ON j.field_id = f.id
       LEFT JOIN clients c ON f.client_id = c.id
       LEFT JOIN users u ON j.operator_id = u.id
+      WHERE j.financial_year_id IS NULL
       ORDER BY j.operator_id, j.date DESC
     `);
     
@@ -629,7 +787,7 @@ app.get("/api/finances", async (req, res) => {
         COALESCE(SUM(j.total_amount), 0) as total_amount
       FROM clients c
       LEFT JOIN fields f ON c.id = f.client_id
-      LEFT JOIN jobs j ON f.id = j.field_id
+      LEFT JOIN jobs j ON f.id = j.field_id AND j.financial_year_id IS NULL
       GROUP BY c.name, f.name, f.area
       ORDER BY c.name, f.name
     `);
